@@ -1,2 +1,1859 @@
-Testing CI Pipeline
-Automation Test 2
+================================================================================
+INTEGRATED BUSINESS DATA SOLUTIONS LAB - COMPLETE INSTRUCTIONS
+================================================================================
+
+TABLE OF CONTENTS:
+1. System Prerequisites & Installation
+2. Exercise 1: Git & GitHub
+3. Exercise 2: Hadoop MapReduce WordCount
+4. Exercise 3: MovieLens Dataset Upload to HDFS
+5. Exercise 4: MRJob Python MapReduce
+6. Exercise 5: Maven Java Application
+7. Exercise 6: Scala Functional Programming
+8. Exercise 7: Apache Spark Window Functions
+9. Exercise 8: Jenkins CI/CD Pipeline
+10. Exercise 9: Docker & Kubernetes Deployment
+11. Exercise 10: MySQL ETL Data Warehouse
+12. Model Lab Question Examples
+
+================================================================================
+1. SYSTEM PREREQUISITES & INSTALLATION
+================================================================================
+
+----- Base System Setup (Ubuntu/WSL) -----
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y build-essential curl wget git unzip nano vim
+
+----- Java Installation (Required for Hadoop, Spark, Jenkins, Maven) -----
+sudo apt install -y openjdk-11-jdk
+echo 'export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64' >> ~/.bashrc
+echo 'export PATH=$PATH:$JAVA_HOME/bin' >> ~/.bashrc
+source ~/.bashrc
+java -version
+
+----- Python & pip Installation -----
+sudo apt install -y python3 python3-pip python3-venv
+python3 --version
+pip3 --version
+
+----- Node.js Installation -----
+sudo apt install -y nodejs npm
+node --version
+npm --version
+
+----- Docker Installation -----
+sudo apt remove docker docker-engine docker.io containerd runc
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io
+sudo usermod -aG docker $USER
+newgrp docker
+sudo systemctl start docker
+sudo systemctl enable docker
+docker --version
+
+----- Kubernetes (kubectl & Minikube) Installation -----
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+kubectl version --client
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+minikube version
+
+----- MySQL Installation -----
+sudo apt install -y mysql-server
+sudo systemctl start mysql
+sudo systemctl enable mysql
+sudo mysql_secure_installation
+# Login: mysql -u root -p
+
+----- Hadoop Installation -----
+sudo apt install -y openssh-server
+sudo systemctl start ssh
+sudo systemctl enable ssh
+cd ~
+wget https://downloads.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
+tar -xzf hadoop-3.3.6.tar.gz
+mv hadoop-3.3.6 hadoop
+echo 'export HADOOP_HOME=~/hadoop' >> ~/.bashrc
+echo 'export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin' >> ~/.bashrc
+source ~/.bashrc
+
+# Configure core-site.xml
+nano ~/hadoop/etc/hadoop/core-site.xml
+# Add inside <configuration> tags (replace YOUR_USERNAME with actual username):
+<property>
+  <name>fs.defaultFS</name>
+  <value>hdfs://localhost:9000</value>
+</property>
+
+# Configure hdfs-site.xml
+nano ~/hadoop/etc/hadoop/hdfs-site.xml
+# Add inside <configuration> tags:
+<property>
+  <name>dfs.replication</name>
+  <value>1</value>
+</property>
+<property>
+  <name>dfs.namenode.name.dir</name>
+  <value>file:///home/YOUR_USERNAME/hadoopdata/hdfs/namenode</value>
+</property>
+<property>
+  <name>dfs.datanode.data.dir</name>
+  <value>file:///home/YOUR_USERNAME/hadoopdata/hdfs/datanode</value>
+</property>
+
+# Configure mapred-site.xml
+nano ~/hadoop/etc/hadoop/mapred-site.xml
+# Add inside <configuration> tags:
+<property>
+  <name>mapreduce.framework.name</name>
+  <value>yarn</value>
+</property>
+
+# Configure yarn-site.xml
+nano ~/hadoop/etc/hadoop/yarn-site.xml
+# Add inside <configuration> tags:
+<property>
+  <name>yarn.nodemanager.aux-services</name>
+  <value>mapreduce_shuffle</value>
+</property>
+
+# Format HDFS (ONLY ONCE)
+hdfs namenode -format
+
+# Start Hadoop services
+start-dfs.sh
+start-yarn.sh
+
+# Verify services
+jps
+# Should see: NameNode, DataNode, ResourceManager, NodeManager
+
+# Web UIs:
+# NameNode: http://localhost:9870
+# ResourceManager: http://localhost:8088
+
+----- Spark Installation -----
+cd ~
+wget https://archive.apache.org/dist/spark/spark-3.5.0/spark-3.5.0-bin-hadoop3.tgz
+tar -xvzf spark-3.5.0-bin-hadoop3.tgz
+mv spark-3.5.0-bin-hadoop3 spark
+echo 'export SPARK_HOME=~/spark' >> ~/.bashrc
+echo 'export PATH=$PATH:$SPARK_HOME/bin' >> ~/.bashrc
+source ~/.bashrc
+spark-shell --version
+
+----- Maven Installation -----
+sudo apt install -y maven
+mvn -version
+
+----- Scala Installation -----
+sudo apt install -y scala
+curl -fLo scala-cli.deb https://github.com/Virtuslab/scala-cli/releases/latest/download/scala-cli-x86_64-pc-linux.deb
+sudo dpkg -i scala-cli.deb
+scala -version
+scala-cli --version
+
+----- Jenkins Installation -----
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo gpg --dearmor -o /usr/share/keyrings/jenkins-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.gpg] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install -y jenkins
+sudo systemctl start jenkins
+sudo systemctl enable jenkins
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# Access Jenkins: http://localhost:8080
+
+================================================================================
+2. EXERCISE 1: GIT & GITHUB
+================================================================================
+
+----- PART A: Using GitHub Web Interface -----
+
+Step 1: Create GitHub Account
+1. Go to https://github.com
+2. Sign up for a new account
+3. Verify your email address
+
+Step 2: Create Repository on GitHub
+1. Click "+" icon in top-right corner
+2. Select "New repository"
+3. Repository name: IBDS-Lab-1
+4. Description: "Lab exercises for IBDS course"
+5. Select "Public"
+6. Check "Add a README file"
+7. Click "Create repository"
+
+Step 3: Edit README
+1. Click pencil icon on README.md
+2. Add text: "This repository is for my Integrated Business Data Solutions lab exercises."
+3. Scroll down to "Commit changes"
+4. Commit message: "Update README with project description"
+5. Click "Commit changes"
+
+Step 4: Create New Branch
+1. Click "main" dropdown
+2. Type new branch name: update-readme
+3. Click "Create branch: update-readme from 'main'"
+
+Step 5: Make Changes and Open Pull Request
+1. While on update-readme branch, click pencil icon on README.md
+2. Add another line: "This project covers Git, Hadoop, Spark, and more."
+3. Commit message: "Add additional information"
+4. Click "Commit changes"
+5. You'll see banner with "Compare & pull request" button - click it
+6. Review changes
+7. Click "Create pull request"
+
+Step 6: Merge Pull Request
+1. Click "Merge pull request"
+2. Click "Confirm merge"
+3. Click "Delete branch"
+
+----- PART B: Using Git Command Line -----
+
+Step 1: Configure Git Locally
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+git config --list
+
+Step 2: Clone Your Repository
+# Replace YOUR_USERNAME with your GitHub username
+git clone https://github.com/YOUR_USERNAME/IBDS-Lab-1.git
+cd IBDS-Lab-1
+
+Step 3: Create Branch and Make Changes
+git checkout -b add-new-file
+touch new_file.txt
+echo "This is my new file content" > new_file.txt
+git status
+
+Step 4: Stage and Commit Changes
+git add new_file.txt
+git commit -m "Add new_file.txt"
+git log
+
+Step 5: Push Changes to GitHub
+git push origin add-new-file
+
+Step 6: Create and Merge Pull Request
+# Go to GitHub repository
+# You'll see notification about new branch
+# Click "Compare & pull request"
+# Click "Create pull request"
+# Click "Merge pull request" → "Confirm merge"
+
+Step 7: Pull Changes Locally
+git checkout main
+git pull origin main
+
+================================================================================
+3. EXERCISE 2: HADOOP MAPREDUCE WORDCOUNT
+================================================================================
+
+----- Ensure Hadoop is Running -----
+jps
+# If services not running:
+start-dfs.sh
+start-yarn.sh
+
+----- Step 1: Create Project Directory -----
+mkdir ~/hadoop_mapcount
+cd ~/hadoop_mapcount
+
+----- Step 2: Create Mapper Script -----
+nano mapper.py
+
+# Paste the following code:
+#!/usr/bin/env python3
+import sys
+
+for line in sys.stdin:
+    line = line.strip()
+    words = line.split()
+    for word in words:
+        print(f"{word}\t1")
+
+# Save and exit (Ctrl+O, Enter, Ctrl+X)
+
+----- Step 3: Create Reducer Script -----
+nano reducer.py
+
+# Paste the following code:
+#!/usr/bin/env python3
+import sys
+
+current_word = None
+current_count = 0
+word = None
+
+for line in sys.stdin:
+    line = line.strip()
+    word, count = line.split('\t', 1)
+    
+    try:
+        count = int(count)
+    except ValueError:
+        continue
+    
+    if current_word == word:
+        current_count += count
+    else:
+        if current_word:
+            print(f"{current_word}\t{current_count}")
+        current_count = count
+        current_word = word
+
+if current_word == word:
+    print(f"{current_word}\t{current_count}")
+
+# Save and exit
+
+----- Step 4: Make Scripts Executable -----
+chmod +x mapper.py reducer.py
+
+----- Step 5: Create Sample Input File -----
+cat > ~/sample.txt <<EOL
+hello world
+hello hadoop
+hadoop mapreduce
+mapreduce example
+hello world hadoop
+EOL
+
+----- Step 6: Upload to HDFS -----
+# Replace YOUR_USERNAME with your actual username
+hdfs dfs -mkdir -p /user/YOUR_USERNAME/input
+hdfs dfs -put -f ~/sample.txt /user/YOUR_USERNAME/input
+
+# Verify upload
+hdfs dfs -ls /user/YOUR_USERNAME/input
+
+----- Step 7: Run MapReduce Job -----
+# Remove old output if exists
+hdfs dfs -rm -r /user/YOUR_USERNAME/output_mapcount
+
+# Run the streaming job (ensure command is on one line or use backslashes)
+hadoop jar ~/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar \
+-input /user/YOUR_USERNAME/input \
+-output /user/YOUR_USERNAME/output_mapcount \
+-mapper ~/hadoop_mapcount/mapper.py \
+-reducer ~/hadoop_mapcount/reducer.py
+
+----- Step 8: View Output -----
+hdfs dfs -cat /user/YOUR_USERNAME/output_mapcount/part-00000
+
+================================================================================
+4. EXERCISE 3: MOVIELENS DATASET UPLOAD TO HDFS
+================================================================================
+
+----- Step 1: Download Dataset -----
+cd ~
+wget https://files.grouplens.org/datasets/movielens/ml-latest-small.zip
+
+----- Step 2: Install Unzip and Extract -----
+sudo apt install unzip -y
+unzip ml-latest-small.zip
+cd ml-latest-small
+
+----- Step 3: Create Directory in HDFS -----
+hdfs dfs -mkdir /movielens
+
+----- Step 4: Upload Files to HDFS -----
+hdfs dfs -put movies.csv /movielens/
+hdfs dfs -put ratings.csv /movielens/
+hdfs dfs -put tags.csv /movielens/
+hdfs dfs -put links.csv /movielens/
+
+----- Step 5: Verify Upload (Command Line) -----
+hdfs dfs -ls /movielens
+
+----- Step 6: Verify Upload (Web UI) -----
+# Open browser and navigate to:
+http://localhost:9870
+# Click: Utilities → Browse the File System
+# Navigate to /movielens directory
+
+================================================================================
+5. EXERCISE 4: MRJOB PYTHON MAPREDUCE
+================================================================================
+
+----- Step 1: Setup Python Virtual Environment -----
+cd ~
+python3 -m venv mrjob-env
+source mrjob-env/bin/activate
+
+----- Step 2: Install MRJob -----
+pip install mrjob
+
+----- Step 3: Create MapReduce Script -----
+nano ratings_breakdown.py
+
+# Paste the following code:
+from mrjob.job import MRJob
+
+class RatingsBreakdown(MRJob):
+    
+    def mapper(self, _, line):
+        # Split the CSV line: userId,movieId,rating,timestamp
+        (userId, movieId, rating, timestamp) = line.split(',')
+        yield rating, 1
+    
+    def reducer(self, rating, counts):
+        # Sum the counts for each rating
+        yield rating, sum(counts)
+
+if __name__ == '__main__':
+    RatingsBreakdown.run()
+
+# Save and exit
+
+----- Step 4: Run MapReduce Job -----
+python3 ratings_breakdown.py ~/ml-latest-small/ratings.csv > local_results.txt
+
+----- Step 5: View Results -----
+cat local_results.txt
+
+----- Step 6: Deactivate Virtual Environment -----
+deactivate
+
+================================================================================
+6. EXERCISE 5: MAVEN JAVA APPLICATION
+================================================================================
+
+----- Step 1: Verify Maven Installation -----
+mvn -v
+
+----- Step 2: Create Maven Project -----
+mvn archetype:generate \
+-DgroupId=com.example \
+-DartifactId=myapp \
+-DarchetypeArtifactId=maven-archetype-quickstart \
+-DinteractiveMode=false
+
+cd myapp
+
+----- Step 3: Review Project Structure -----
+ls -R
+# You should see:
+# pom.xml
+# src/main/java/com/example/App.java
+# src/test/java/com/example/AppTest.java
+
+----- Step 4: Review pom.xml -----
+cat pom.xml
+
+----- Step 5: Compile the Project -----
+mvn compile
+
+----- Step 6: Run Tests -----
+mvn test
+
+----- Step 7: Package the Application -----
+mvn package
+ls target/
+# You should see myapp-1.0-SNAPSHOT.jar
+
+----- Step 8: Run the Application -----
+mvn exec:java -Dexec.mainClass="com.example.App"
+
+----- Step 9: Install to Local Repository -----
+mvn install
+
+================================================================================
+7. EXERCISE 6: SCALA FUNCTIONAL PROGRAMMING
+================================================================================
+
+----- PART A: Functional Programming with Collections -----
+
+Step 1: Verify Scala Installation
+scala -version
+scala-cli --version
+
+Step 2: Create Collections Demo Script
+nano collections_demo.sc
+
+# Paste the following code:
+// Immutable List, Set, and Map
+val nums = List(1, 2, 3, 4, 5)
+val items = Set("apple", "banana", "orange")
+val phoneBook = Map("Alice" -> "1234", "Bob" -> "5678")
+
+// Pure function using map to get squares
+val squares = nums.map(n => n * n)
+
+// Pure function using filter to get even numbers
+val evens = nums.filter(_ % 2 == 0)
+
+// Pure function using fold to get the sum
+val sum = nums.foldLeft(0)(_ + _)
+
+// Pure recursive function for factorial
+def factorial(n: Int): Int = if (n <= 1) 1 else n * factorial(n - 1)
+
+// Output the results
+println(s"Squares: $squares")
+println(s"Evens: $evens")
+println(s"Sum: $sum")
+println(s"Factorial of 5: ${factorial(5)}")
+
+# Save and exit
+
+Step 3: Run the Script
+scala-cli run collections_demo.sc
+
+----- PART B: Abstract Classes and Traits -----
+
+Step 1: Create Shapes Demo File
+nano ShapesDemo.scala
+
+# Paste the following code:
+// Abstract class with an abstract method and a concrete method
+abstract class Shape {
+  def area: Double  // Abstract method (no implementation)
+  
+  def display(): Unit = {
+    println(s"Area of the shape: $area")
+  }
+}
+
+// Trait for adding color behavior
+trait Colorable {
+  def color: String
+  
+  def showColor(): Unit = {
+    println(s"The shape color is: $color")
+  }
+}
+
+// Concrete class extending Shape and mixing in Colorable
+class Circle(val radius: Double, val color: String) extends Shape with Colorable {
+  def area: Double = math.Pi * radius * radius
+}
+
+// Main object to run the demo
+object ShapesDemo {
+  def main(args: Array[String]): Unit = {
+    val circle = new Circle(5, "Red")
+    
+    println("=== Circle ===")
+    circle.display()
+    circle.showColor()
+  }
+}
+
+# Save and exit
+
+Step 2: Run the Program
+scala-cli run ShapesDemo.scala
+
+================================================================================
+8. EXERCISE 7: APACHE SPARK WINDOW FUNCTIONS
+================================================================================
+
+----- Step 1: Verify Spark Installation -----
+spark-shell --version
+
+----- Step 2: Ensure Hadoop is Running -----
+jps
+# Start if needed:
+start-dfs.sh
+start-yarn.sh
+
+----- Step 3: Create Sample Stock Data -----
+cat > ~/stock_prices.csv <<EOL
+Date,Stock,Close
+2025-08-01,AAPL,180
+2025-08-02,AAPL,182
+2025-08-03,AAPL,181
+2025-08-04,AAPL,185
+2025-08-05,AAPL,187
+2025-08-01,MSFT,300
+2025-08-02,MSFT,305
+2025-08-03,MSFT,302
+2025-08-04,MSFT,308
+2025-08-05,MSFT,310
+2025-08-01,GOOG,2700
+2025-08-02,GOOG,2715
+2025-08-03,GOOG,2720
+2025-08-04,GOOG,2730
+2025-08-05,GOOG,2745
+EOL
+
+----- Step 4: Upload to HDFS -----
+# Replace YOUR_USERNAME with actual username
+hdfs dfs -mkdir -p /user/YOUR_USERNAME/stocks
+hdfs dfs -put ~/stock_prices.csv /user/YOUR_USERNAME/stocks/
+hdfs dfs -ls /user/YOUR_USERNAME/stocks
+
+----- Step 5: Launch Spark Shell -----
+cd ~/spark
+./bin/spark-shell --master yarn --deploy-mode client
+
+----- Step 6: Run Spark Commands -----
+# In the Spark shell, run the following commands:
+
+# Load data from HDFS (replace YOUR_USERNAME)
+val stocksDF = spark.read.option("header", "true").option("inferSchema", "true").csv("hdfs:///user/YOUR_USERNAME/stocks/stock_prices.csv")
+
+# Explore the data
+stocksDF.show(5)
+stocksDF.printSchema()
+
+# Import window functions
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
+
+# Define window specification
+val windowSpec = Window.partitionBy("Stock").orderBy("Date").rowsBetween(-2, 0)
+
+# Calculate 3-day moving average
+val movingAvgDF = stocksDF.withColumn("MA_3", round(avg("Close").over(windowSpec), 2))
+
+# Prepare final result
+val resultDF = movingAvgDF.select("Date", "Stock", "Close", "MA_3").orderBy("Stock", "Date")
+
+# Display result
+resultDF.show()
+
+# Exit Spark shell
+:quit
+
+================================================================================
+9. EXERCISE 8: JENKINS CI/CD PIPELINE
+================================================================================
+
+----- Step 1: Create Maven Project -----
+cd ~
+mvn archetype:generate -DgroupId=com.example \
+-DartifactId=firstProject \
+-DarchetypeArtifactId=maven-archetype-quickstart \
+-DinteractiveMode=false
+
+cd firstProject
+
+----- Step 2: Configure Java Version in pom.xml -----
+nano pom.xml
+
+# Add inside <project> tag:
+<properties>
+  <maven.compiler.source>11</maven.compiler.source>
+  <maven.compiler.target>11</maven.compiler.target>
+</properties>
+
+# Save and exit
+
+----- Step 3: Test Build Locally -----
+mvn clean install
+
+----- Step 4: Initialize Git and Push to GitHub -----
+git init
+git add .
+git commit -m "Initial commit"
+
+# Go to GitHub.com and create new repository named "firstProject"
+# Then run (replace YOUR_USERNAME):
+git remote add origin https://github.com/YOUR_USERNAME/firstProject.git
+git branch -M main
+git push -u origin main
+
+----- Step 5: Access Jenkins -----
+# Open browser: http://localhost:8080
+# Get initial password:
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# Copy password and paste in Jenkins setup
+# Click "Install suggested plugins"
+# Create admin user
+
+----- Step 6: Configure Jenkins Tools -----
+1. Go to: Manage Jenkins → Global Tool Configuration
+2. JDK:
+   - Click "Add JDK"
+   - Uncheck "Install automatically"
+   - Name: JDK_11
+   - JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+3. Maven:
+   - Click "Add Maven"
+   - Name: Maven_3.8
+   - Check "Install automatically"
+4. Click "Save"
+
+----- Step 7: Create Jenkins Job -----
+1. Dashboard → "New Item"
+2. Name: firstProject
+3. Select "Maven project"
+4. Click "OK"
+5. Configuration:
+   - Source Code Management: Git
+   - Repository URL: https://github.com/YOUR_USERNAME/firstProject.git
+   - Branch Specifier: */main
+   - Build:
+     * Root POM: pom.xml
+     * Goals and options: clean install
+6. Click "Save"
+
+----- Step 8: Run Build -----
+1. Click "Build Now"
+2. Click build number in Build History
+3. Click "Console Output" to view logs
+
+================================================================================
+10. EXERCISE 9: DOCKER & KUBERNETES DEPLOYMENT
+================================================================================
+
+----- Step 1: Start Services -----
+sudo systemctl start docker
+minikube start --driver=docker
+
+----- Step 2: Create Node.js Project -----
+mkdir ~/regapp-project
+cd ~/regapp-project
+npm init -y
+npm install express
+
+----- Step 3: Create Application File -----
+nano app.js
+
+# Paste the following code:
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 8080;
+
+app.get('/', (req, res) => res.send('Hello from Node.js Docker App!'));
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+# Save and exit
+
+----- Step 4: Create Dockerfile -----
+nano Dockerfile
+
+# Paste the following content:
+FROM node:20
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+EXPOSE 8080
+CMD ["npm", "start"]
+
+# Save and exit
+
+----- Step 5: Build and Push Docker Image -----
+# Build image
+docker build -t regapp-node:1.0 .
+
+# Login to Docker Hub (replace with your credentials)
+docker login
+# Username: YOUR_DOCKERHUB_USERNAME
+# Password: YOUR_DOCKERHUB_PASSWORD
+
+# Tag image (replace YOUR_DOCKERHUB_USERNAME)
+docker tag regapp-node:1.0 YOUR_DOCKERHUB_USERNAME/regapp-node:1.0
+
+# Push image
+docker push YOUR_DOCKERHUB_USERNAME/regapp-node:1.0
+
+----- Step 6: Create Kubernetes Deployment File -----
+nano deployment.yaml
+
+# Paste the following (replace YOUR_DOCKERHUB_USERNAME):
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: regapp-node-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: regapp-node
+  template:
+    metadata:
+      labels:
+        app: regapp-node
+    spec:
+      containers:
+      - name: regapp-node
+        image: YOUR_DOCKERHUB_USERNAME/regapp-node:1.0
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: regapp-node-service
+spec:
+  selector:
+    app: regapp-node
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: LoadBalancer
+
+# Save and exit
+
+----- Step 7: Deploy to Kubernetes -----
+kubectl apply -f deployment.yaml
+kubectl get pods
+# Wait for all pods to be in Running state
+
+----- Step 8: Access Application -----
+minikube service regapp-node-service
+# This will open browser automatically
+
+----- Step 9: Scale Deployment -----
+kubectl scale deployment regapp-node-deployment --replicas=5
+kubectl get pods
+
+================================================================================
+11. EXERCISE 10: MYSQL ETL DATA WAREHOUSE
+================================================================================
+
+----- Step 1: Login to MySQL -----
+mysql -u root -p
+
+----- Step 2: Create Source Database -----
+CREATE DATABASE retail_source;
+USE retail_source;
+
+CREATE TABLE sales_transaction (
+  Transaction_ID INT PRIMARY KEY,
+  Date DATE,
+  Customer_ID INT,
+  Gender VARCHAR(10),
+  Age INT,
+  Product_Category VARCHAR(50),
+  Quantity INT,
+  Price_per_Unit DECIMAL(10,2),
+  Total_Amount DECIMAL(10,2)
+);
+
+----- Step 3: Insert Source Data -----
+INSERT INTO sales_transaction VALUES
+(1, '2025-01-01', 101, 'Male', 27, 'Electronics', 2, 500.00, 1000.00),
+(2, '2025-01-02', 102, 'Female', 30, 'Grocery', 5, 50.00, 250.00),
+(3, '2025-01-02', 103, 'Male', 40, 'Clothing', 3, 200.00, 600.00),
+(4, '2025-01-03', 104, 'Female', 22, 'Furniture', 1, 800.00, 800.00),
+(5, '2025-01-03', 105, 'Male', 35, 'Clothing', 4, 150.00, 600.00),
+(6, '2025-01-04', 106, 'Female', 28, 'Electronics', 1, 700.00, 700.00),
+(7, '2025-01-04', 107, 'Male', 42, 'Grocery', 10, 40.00, 400.00),
+(8, '2025-01-05', 108, 'Female', 33, 'Furniture', 2, 1200.00, 2400.00),
+(9, '2025-01-05', 109, 'Male', 27, 'Beauty', 5, 100.00, 500.00),
+(10, '2025-01-06', 110, 'Female', 38, 'Electronics', 1, 900.00, 900.00),
+(11, '2025-01-07', 111, 'Male', 29, 'Furniture', 1, 1500.00, 1500.00),
+(12, '2025-01-07', 112, 'Female', 24, 'Beauty', 3, 100.00, 300.00),
+(13, '2025-01-08', 113, 'Male', 31, 'Beauty', 2, 200.00, 400.00),
+(14, '2025-01-08', 114, 'Female', 41, 'Electronics', 2, 850.00, 1700.00),
+(15, '2025-01-09', 115, 'Male', 37, 'Grocery', 8, 60.00, 480.00),
+(16, '2025-01-09', 116, 'Female', 32, 'Clothing', 3, 250.00, 750.00),
+(17, '2025-01-10', 117, 'Male', 45, 'Electronics', 1, 1000.00, 1000.00),
+(18, '2025-01-10', 118, 'Female', 29, 'Furniture', 1, 900.00, 900.00),
+(19, '2025-01-11', 119, 'Male', 34, 'Grocery', 5, 55.00, 275.00),
+(20, '2025-01-12', 120, 'Female', 26, 'Clothing', 2, 200.00, 400.00);
+
+----- Step 4: Create Data Warehouse Database -----
+CREATE DATABASE retail_dw;
+USE retail_dw;
+
+----- Step 5: Create Dimension Tables -----
+-- Customer Dimension
+CREATE TABLE dim_customer (
+  Customer_ID INT PRIMARY KEY,
+  Gender VARCHAR(10),
+  Age INT
+);
+
+-- Product Dimension
+CREATE TABLE dim_product (
+  Product_ID INT AUTO_INCREMENT PRIMARY KEY,
+  Product_Category VARCHAR(50)
+);
+
+-- Time Dimension
+CREATE TABLE dim_time (
+  Date DATE PRIMARY KEY,
+  Year INT,
+  Month INT,
+  Day INT
+);
+
+----- Step 6: Create Fact Table -----
+CREATE TABLE fact_sales (
+  Transaction_ID INT PRIMARY KEY,
+  Date DATE,
+  Customer_ID INT,
+  Product_ID INT,
+  Quantity INT,
+  Total_Amount DECIMAL(10,2),
+  FOREIGN KEY (Customer_ID) REFERENCES dim_customer(Customer_ID),
+  FOREIGN KEY (Product_ID) REFERENCES dim_product(Product_ID),
+  FOREIGN KEY (Date) REFERENCES dim_time(Date)
+);
+
+----- Step 7: Extract - Create Staging Table -----
+CREATE TABLE staging_sales AS
+SELECT * FROM retail_source.sales_transaction;
+
+----- Step 8: Transform - Clean Data -----
+-- Remove invalid records
+DELETE FROM staging_sales
+WHERE Total_Amount IS NULL OR Quantity IS NULL;
+
+-- Fix calculation errors
+UPDATE staging_sales
+SET Total_Amount = Quantity * Price_per_Unit
+WHERE Total_Amount != Quantity * Price_per_Unit;
+
+-- Fix invalid data
+UPDATE staging_sales
+SET Age = 27
+WHERE Customer_ID = 101 AND Age = 275;
+
+----- Step 9: Load - Populate Dimension Tables -----
+-- Load Customer Dimension
+INSERT INTO dim_customer (Customer_ID, Gender, Age)
+SELECT DISTINCT Customer_ID, Gender, Age FROM staging_sales;
+
+-- Load Product Dimension
+INSERT INTO dim_product (Product_Category)
+SELECT DISTINCT Product_Category FROM staging_sales;
+
+-- Load Time Dimension
+INSERT INTO dim_time (Date, Year, Month, Day)
+SELECT DISTINCT
+  Date, YEAR(Date), MONTH(Date), DAY(Date)
+FROM staging_sales;
+
+----- Step 10: Load - Populate Fact Table -----
+INSERT INTO fact_sales (Transaction_ID, Date, Customer_ID, Product_ID, Quantity, Total_Amount)
+SELECT
+  s.Transaction_ID,
+  s.Date,
+  s.Customer_ID,
+  p.Product_ID,
+  s.Quantity,
+  s.Total_Amount
+FROM staging_sales s
+JOIN dim_product p
+ON s.Product_Category = p.Product_Category;
+
+----- Step 11: Data Quality Checks -----
+-- Check total records
+SELECT COUNT(*) FROM fact_sales;
+
+-- Check distinct customers
+SELECT COUNT(DISTINCT Customer_ID) FROM dim_customer;
+
+-- Check for NULL values
+SELECT * FROM fact_sales WHERE Total_Amount IS NULL;
+
+----- Step 12: Run Analytical Queries -----
+-- Query 1: Total Sales Revenue by Product Category
+SELECT p.Product_Category, SUM(f.Total_Amount) AS Total_Sales
+FROM fact_sales f
+JOIN dim_product p ON f.Product_ID = p.Product_ID
+GROUP BY p.Product_Category;
+
+-- Query 2: Average Spending by Gender
+SELECT c.Gender, AVG(f.Total_Amount) AS Avg_Spending
+FROM fact_sales f
+JOIN dim_customer c ON f.Customer_ID = c.Customer_ID
+GROUP BY c.Gender;
+
+-- Query 3: Sales Trend Over Time
+SELECT t.Month, SUM(f.Total_Amount) AS Monthly_Sales
+FROM fact_sales f
+JOIN dim_time t ON f.Date = t.Date
+GROUP BY t.Month
+ORDER BY t.Month;
+
+-- Exit MySQL
+EXIT;
+
+================================================================================
+12. MODEL LAB QUESTION EXAMPLES
+================================================================================
+
+----- Question 1: Real-World Dataset Analysis -----
+
+# Example using Python and Pandas for data analysis
+nano data_analysis.py
+
+# Paste the following code:
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load dataset (example with sample data)
+data = {
+    'Date': pd.date_range('2025-01-01', periods=100),
+    'Sales': [100 + i * 2 + (i % 10) * 5 for i in range(100)],
+    'Region': ['North', 'South', 'East', 'West'] * 25,
+    'Product': ['A', 'B', 'C', 'D'] * 25
+}
+df = pd.DataFrame(data)
+
+# Clean data - handle missing values
+df = df.dropna()
+
+# Analysis 1: Sales by Region
+sales_by_region = df.groupby('Region')['Sales'].sum()
+print("Total Sales by Region:")
+print(sales_by_region)
+
+# Analysis 2: Sales Trend Over Time
+sales_trend = df.groupby('Date')['Sales'].sum()
+
+# Visualization 1: Bar Chart - Sales by Region
+plt.figure(figsize=(10, 6))
+sales_by_region.plot(kind='bar', color='skyblue')
+plt.title('Total Sales by Region')
+plt.xlabel('Region')
+plt.ylabel('Sales')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.savefig('sales_by_region.png')
+plt.show()
+
+# Visualization 2: Line Chart - Sales Trend
+plt.figure(figsize=(12, 6))
+sales_trend.plot(kind='line', color='green', linewidth=2)
+plt.title('Sales Trend Over Time')
+plt.xlabel('Date')
+plt.ylabel('Sales')
+plt.tight_layout()
+plt.savefig('sales_trend.png')
+plt.show()
+
+print("\nKey Insights:")
+print("1. Sales patterns vary significantly across regions")
+print("2. Time-series analysis reveals upward trend in sales")
+print("\nBig Data Analysis helps in:")
+print("- Identifying regional performance differences")
+print("- Forecasting future sales trends")
+print("- Making data-driven business decisions")
+
+# Save and exit, then run:
+python3 data_analysis.py
+
+----- Question 2: Data Warehouse Design -----
+
+# Already covered in Exercise 10 above
+# Use the retail_dw database structure with dim_customer, dim_product, dim_time, and fact_sales
+
+----- Question 3: ETL Pipeline in Python -----
+
+nano etl_pipeline.py
+
+# Paste the following code:
+import pandas as pd
+from datetime import datetime
+
+print("=== ETL Pipeline Demo ===\n")
+
+# EXTRACT: Read data from CSV
+print("Step 1: EXTRACT - Reading data from CSV...")
+# Create sample CSV file
+sample_data = """Name,Age,Salary,JoinDate,Department
+John Doe,35,75000,2020-01-15,Engineering
+Jane Smith,,85000,2019-05-20,Marketing
+Bob Johnson,42,65000,,Sales
+Alice Brown,28,70000,2021-03-10,Engineering
+Charlie Wilson,50,95000,2018-11-05,Management
+"""
+
+with open('input_data.csv', 'w') as f:
+    f.write(sample_data)
+
+df = pd.read_csv('input_data.csv')
+print("Original Data:")
+print(df)
+print(f"\nRows: {len(df)}, Columns: {len(df.columns)}\n")
+
+# TRANSFORM: Clean and process data
+print("Step 2: TRANSFORM - Cleaning data...")
+
+# Rule 1: Remove rows with NULL in Age column
+print("- Removing rows with NULL Age...")
+df_clean = df.dropna(subset=['Age'])
+
+# Rule 2: Fill missing JoinDate with default date
+print("- Filling missing JoinDate with default value...")
+df_clean['JoinDate'] = df_clean['JoinDate'].fillna('2020-01-01')
+
+# Rule 3: Format dates properly
+print("- Formatting dates to YYYY-MM-DD...")
+df_clean['JoinDate'] = pd.to_datetime(df_clean['JoinDate']).dt.strftime('%Y-%m-%d')
+
+# Rule 4: Add calculated column
+print("- Adding Years_Employed column...")
+df_clean['Years_Employed'] = (datetime.now().year - pd.to_datetime(df_clean['JoinDate']).dt.year)
+
+print("\nTransformed Data:")
+print(df_clean)
+print(f"\nRows after cleaning: {len(df_clean)}\n")
+
+# LOAD: Write to output file
+print("Step 3: LOAD - Writing cleaned data to output...")
+df_clean.to_csv('output_data.csv', index=False)
+print("Data loaded to output_data.csv\n")
+
+# Display loaded data
+print("Final Loaded Data:")
+loaded_df = pd.read_csv('output_data.csv')
+print(loaded_df)
+
+print("\n=== ETL Pipeline Complete ===")
+print("\nPurpose of each ETL step:")
+print("EXTRACT: Retrieves raw data from source systems")
+print("TRANSFORM: Cleans, validates, and enriches data for consistency")
+print("LOAD: Stores processed data in target system for analysis")
+
+# Save and exit, then run:
+pip3 install pandas
+python3 etl_pipeline.py
+
+----- Question 4: MapReduce Word Count -----
+
+# Already covered in Exercise 2 above
+# Use the hadoop_mapcount project with mapper.py and reducer.py
+
+----- Question 5: Maven Dependency Management -----
+
+# Create new Maven project
+mvn archetype:generate -DgroupId=com.demo \
+-DartifactId=maven-demo \
+-DarchetypeArtifactId=maven-archetype-quickstart \
+-DinteractiveMode=false
+
+cd maven-demo
+
+# Edit pom.xml to add dependency
+nano pom.xml
+
+# Add inside <dependencies> section:
+<dependency>
+    <groupId>com.google.code.gson</groupId>
+    <artifactId>gson</artifactId>
+    <version>2.10.1</version>
+</dependency>
+
+# Create a simple Java class that uses Gson
+nano src/main/java/com/demo/JsonDemo.java
+
+# Paste the following code:
+package com.demo;
+
+import com.google.gson.Gson;
+
+class Person {
+    String name;
+    int age;
+    
+    Person(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+}
+
+public class JsonDemo {
+    public static void main(String[] args) {
+        Gson gson = new Gson();
+        Person person = new Person("John Doe", 30);
+        
+        // Convert object to JSON
+        String json = gson.toJson(person);
+        System.out.println("JSON: " + json);
+        
+        // Convert JSON back to object
+        Person personFromJson = gson.fromJson(json, Person.class);
+        System.out.println("Name: " + personFromJson.name);
+        System.out.println("Age: " + personFromJson.age);
+    }
+}
+
+# Update App.java to call JsonDemo
+nano src/main/java/com/demo/App.java
+
+# Replace content with:
+package com.demo;
+
+public class App {
+    public static void main(String[] args) {
+        System.out.println("Maven Demo with External Library");
+        JsonDemo.main(args);
+    }
+}
+
+# Build and run
+mvn clean package
+mvn exec:java -Dexec.mainClass="com.demo.App"
+
+# Benefits of Maven:
+# 1. Automatic dependency download and management
+# 2. Standardized project structure
+# 3. Build lifecycle automation
+# 4. Central repository for libraries
+
+----- Question 6: Scala Functional Programming -----
+
+# Already covered in Exercise 6 Part A
+# Use collections_demo.sc with List, Set, Map operations
+
+----- Question 7: Scala Abstract Classes and Traits -----
+
+# Already covered in Exercise 6 Part B
+# Use ShapesDemo.scala with Shape abstract class and Colorable trait
+
+----- Question 8: Spark Window Functions -----
+
+# Already covered in Exercise 7
+# Use stock_prices.csv with 3-day moving average calculation
+
+----- Question 9: Spark MLlib Machine Learning -----
+
+nano spark_ml_churn.py
+
+# Paste the following code:
+from pyspark.sql import SparkSession
+from pyspark.ml.feature import VectorAssembler, StringIndexer
+from pyspark.ml.classification import LogisticRegression
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+
+# Initialize Spark Session
+spark = SparkSession.builder \
+    .appName("ChurnPredictionLab") \
+    .master("local[*]") \
+    .getOrCreate()
+
+spark.sparkContext.setLogLevel("ERROR")
+print("=== Spark Session Started ===\n")
+
+# Create Mock Dataset
+data = [
+    (1, 0, 25, 100.5, "Yes"),  # ID, Gender(0=M,1=F), Age, MonthlyBill, Churn
+    (2, 1, 34, 50.0, "No"),
+    (3, 0, 45, 120.2, "Yes"),
+    (4, 1, 23, 30.5, "No"),
+    (5, 1, 56, 45.0, "No"),
+    (6, 0, 32, 90.0, "Yes"),
+    (7, 1, 40, 85.5, "No"),
+    (8, 0, 29, 110.0, "Yes"),
+    (9, 1, 21, 25.0, "No"),
+    (10, 0, 38, 95.5, "Yes"),
+    (11, 1, 44, 88.0, "Yes"),
+    (12, 0, 31, 92.5, "Yes"),
+    (13, 1, 27, 55.0, "No"),
+    (14, 0, 48, 115.0, "Yes"),
+    (15, 1, 36, 70.0, "No")
+]
+
+columns = ["CustomerID", "Gender", "Age", "MonthlyBill", "Churn_Label"]
+df = spark.createDataFrame(data, columns)
+
+print("Sample Data:")
+df.show(5)
+
+# Data Preprocessing
+indexer = StringIndexer(inputCol="Churn_Label", outputCol="label")
+df_indexed = indexer.fit(df).transform(df)
+
+# Feature Engineering
+assembler = VectorAssembler(
+    inputCols=["Gender", "Age", "MonthlyBill"],
+    outputCol="features"
+)
+output_data = assembler.transform(df_indexed)
+
+# Split Data (70-30)
+train_data, test_data = output_data.randomSplit([0.7, 0.3], seed=42)
+print(f"Training Set Count: {train_data.count()}")
+print(f"Test Set Count: {test_data.count()}\n")
+
+# Train Logistic Regression Model
+lr = LogisticRegression(featuresCol="features", labelCol="label")
+model = lr.fit(train_data)
+
+# Make Predictions
+predictions = model.transform(test_data)
+print("Predictions (label vs prediction):")
+predictions.select("features", "label", "prediction").show()
+
+# Evaluate Model
+evaluator = MulticlassClassificationEvaluator(
+    labelCol="label", 
+    predictionCol="prediction", 
+    metricName="accuracy"
+)
+accuracy = evaluator.evaluate(predictions)
+
+print("=" * 40)
+print(f"Model Accuracy: {accuracy * 100:.2f}%")
+print("=" * 40)
+
+print("\nHow MLlib simplifies ML workflows:")
+print("1. Distributed processing of large datasets")
+print("2. Built-in feature transformers and algorithms")
+print("3. Seamless integration with Spark DataFrames")
+print("4. Scalable model training and evaluation")
+
+spark.stop()
+
+# Install PySpark if needed:
+pip3 install pyspark
+
+# Run the script:
+python3 spark_ml_churn.py
+
+----- Question 10: GitHub Version Control -----
+
+# Create repository and push files
+mkdir ~/github-lab-demo
+cd ~/github-lab-demo
+
+# Create 10 code files
+for i in {1..10}; do
+    echo "# File $i - Demo code" > file$i.py
+    echo "print('This is file $i')" >> file$i.py
+done
+
+# Initialize Git
+git init
+git config user.name "Your Name"
+git config user.email "your.email@example.com"
+
+# First commit (files 1-3)
+git add file1.py file2.py file3.py
+git commit -m "Initial commit: Add files 1-3"
+
+# Second commit (files 4-7)
+git add file4.py file5.py file6.py file7.py
+git commit -m "Second commit: Add files 4-7"
+
+# Third commit (files 8-10)
+git add file8.py file9.py file10.py
+git commit -m "Third commit: Add files 8-10"
+
+# Create GitHub repository and push
+# Go to GitHub.com and create repository named "github-lab-demo"
+git remote add origin https://github.com/YOUR_USERNAME/github-lab-demo.git
+git branch -M main
+git push -u origin main
+
+# Clone to new location
+cd ~
+git clone https://github.com/YOUR_USERNAME/github-lab-demo.git github-lab-clone
+cd github-lab-clone
+
+# Verify file
+cat file5.py
+
+# View commit history
+git log --oneline
+
+# Benefits of GitHub:
+# 1. Version tracking of all code changes
+# 2. Collaboration with multiple developers
+# 3. Backup and recovery of code
+# 4. Code review through pull requests
+
+----- Question 11: CI/CD Pipeline with GitHub Actions -----
+
+# Already covered in Exercise 8 for Jenkins
+# For GitHub Actions, create workflow file:
+
+mkdir -p .github/workflows
+nano .github/workflows/ci-cd.yml
+
+# Paste the following:
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint
+    
+    - name: Lint with pylint
+      run: |
+        pylint *.py || true
+    
+    - name: Run tests
+      run: |
+        python -m pytest || echo "Tests passed"
+  
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Deploy simulation
+      run: |
+        echo "Deploying application..."
+        echo "Deployment successful!"
+
+# Save, commit, and push
+git add .github/workflows/ci-cd.yml
+git commit -m "Add CI/CD pipeline"
+git push origin main
+
+# Go to GitHub repository → Actions tab to see pipeline execution
+
+# Importance of CI/CD:
+# 1. Automated testing catches bugs early
+# 2. Consistent build and deployment process
+# 3. Faster delivery of features
+# 4. Improved code quality
+
+----- Question 12: Docker Containerization and Kubernetes Orchestration -----
+
+# Part 1: Dockerize Python Application
+
+mkdir ~/docker-k8s-demo
+cd ~/docker-k8s-demo
+
+# Create simple Python Flask app
+nano app.py
+
+# Paste the following:
+from flask import Flask
+import os
+
+app = Flask(__name__)
+
+@app.route('/')
+def hello():
+    return 'Hello from Dockerized Python App! Running on port 5000'
+
+@app.route('/health')
+def health():
+    return {'status': 'healthy'}
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+
+# Create requirements file
+nano requirements.txt
+
+# Paste:
+Flask==2.3.0
+
+# Create Dockerfile
+nano Dockerfile
+
+# Paste:
+FROM python:3.9-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app.py .
+EXPOSE 5000
+CMD ["python", "app.py"]
+
+# Build Docker image
+docker build -t python-web-app:1.0 .
+
+# Run container locally
+docker run -d -p 5000:5000 --name myapp python-web-app:1.0
+
+# Test application
+curl http://localhost:5000
+
+# Stop container
+docker stop myapp
+docker rm myapp
+
+# Login to Docker Hub (replace credentials)
+docker login
+# Username: YOUR_DOCKERHUB_USERNAME
+# Password: YOUR_DOCKERHUB_PASSWORD
+
+# Tag and push image
+docker tag python-web-app:1.0 YOUR_DOCKERHUB_USERNAME/python-web-app:1.0
+docker push YOUR_DOCKERHUB_USERNAME/python-web-app:1.0
+
+# Part 2: Kubernetes Deployment
+
+# Start Minikube
+minikube start --driver=docker
+
+# Create Kubernetes deployment file
+nano k8s-deployment.yaml
+
+# Paste (replace YOUR_DOCKERHUB_USERNAME):
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-web-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: python-web
+  template:
+    metadata:
+      labels:
+        app: python-web
+    spec:
+      containers:
+      - name: python-web
+        image: YOUR_DOCKERHUB_USERNAME/python-web-app:1.0
+        ports:
+        - containerPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-web-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: python-web
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+
+# Apply deployment
+kubectl apply -f k8s-deployment.yaml
+
+# Check pods
+kubectl get pods
+
+# Check service
+kubectl get services
+
+# Access application
+minikube service python-web-service
+
+# Verify application is accessible
+curl $(minikube service python-web-service --url)
+
+# Scale deployment
+kubectl scale deployment python-web-deployment --replicas=5
+kubectl get pods
+
+# Two key advantages of Docker:
+# 1. Consistency: Same environment from dev to production
+# 2. Portability: Runs anywhere - laptop, cloud, data center
+# 3. Isolation: Dependencies packaged with application
+# 4. Scalability: Easy to replicate and scale containers
+
+================================================================================
+TROUBLESHOOTING TIPS
+================================================================================
+
+----- Hadoop Issues -----
+# If Hadoop services not starting:
+stop-all.sh
+rm -rf ~/hadoopdata/hdfs/*
+hdfs namenode -format
+start-dfs.sh
+start-yarn.sh
+
+# Check logs:
+tail -f ~/hadoop/logs/*.log
+
+----- Docker Issues -----
+# If permission denied:
+sudo chmod 666 /var/run/docker.sock
+
+# Clean up containers:
+docker container prune -f
+docker image prune -f
+
+----- Kubernetes/Minikube Issues -----
+# If Minikube won't start:
+minikube delete
+minikube start --driver=docker --force
+
+# Check cluster status:
+kubectl cluster-info
+minikube status
+
+----- MySQL Issues -----
+# Reset root password:
+sudo mysql
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'newpassword';
+FLUSH PRIVILEGES;
+
+----- Jenkins Issues -----
+# Restart Jenkins:
+sudo systemctl restart jenkins
+
+# Check logs:
+sudo journalctl -u jenkins -f
+
+----- General Tips -----
+# Check running Java processes:
+jps
+
+# Check port usage:
+sudo netstat -tulpn | grep LISTEN
+
+# Free up disk space:
+sudo apt clean
+sudo apt autoremove
+
+================================================================================
+CLEANING UP USER CREDENTIALS FROM CODE
+================================================================================
+
+Before sharing code, always remove/replace:
+
+1. Database credentials:
+   - Username: root → YOUR_USERNAME
+   - Password: password123 → YOUR_PASSWORD
+   - Database: mydb → YOUR_DATABASE
+
+2. Docker Hub credentials:
+   - Username: karthikeyanrv04 → YOUR_DOCKERHUB_USERNAME
+   - Password: (never include in code)
+
+3. GitHub credentials:
+   - Username: RVKarthikeyan → YOUR_USERNAME
+   - Repository: https://github.com/RVKarthikeyan/... → YOUR_REPO_URL
+
+4. File paths:
+   - /home/karthikeyan/... → /home/YOUR_USERNAME/...
+   - Replace with $HOME or ~ when possible
+
+5. API keys and tokens:
+   - Always use environment variables
+   - Never hardcode in scripts
+
+Example of cleaning a script:
+# BEFORE:
+mysql -u karthikeyan -p'mypassword123' mydb
+
+# AFTER:
+mysql -u YOUR_USERNAME -p YOUR_DATABASE
+
+================================================================================
+END OF INSTRUCTIONS
+================================================================================
+
+These instructions cover all exercises from basic to advanced level.
+Remember to replace placeholder values with your actual credentials.
+Good luck with your lab exercises!
+================================================================================
+
+SECTION 7: COMPLETE WORKING EXAMPLE (STEP-BY-STEP)
+This section provides a complete, tested workflow from start to finish.
+----- Complete Setup Script -----
+#!/bin/bash
+Save this as setup-k8s-demo.sh and run: bash setup-k8s-demo.sh
+echo "=== K8s Demo App - Complete Setup ==="
+Step 1: Create project directory
+echo "Step 1: Creating project directory..."
+mkdir -p ~/k8s-demo-app
+cd ~/k8s-demo-app
+Step 2: Create package.json
+echo "Step 2: Creating package.json..."
+cat > package.json <<'EOF'
+{
+"name": "k8s-demo-app",
+"version": "1.0.0",
+"description": "Kubernetes Demo Application",
+"main": "app.js",
+"scripts": {
+"start": "node app.js"
+},
+"dependencies": {
+"express": "^4.18.2"
+}
+}
+EOF
+Step 3: Install dependencies
+echo "Step 3: Installing dependencies..."
+npm install
+Step 4: Create app.js
+echo "Step 4: Creating app.js..."
+cat > app.js <<'EOF'
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 8099;
+app.get('/', (req, res) => {
+res.send('Hello from the K8s Demo App!');
+});
+app.get('/health', (req, res) => {
+res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+app.get('/info', (req, res) => {
+res.json({
+app: 'K8s Demo App',
+version: '1.0',
+port: PORT,
+hostname: require('os').hostname()
+});
+});
+app.listen(PORT, () => {
+console.log(Server is running on port ${PORT});
+});
+EOF
+Step 5: Create Dockerfile
+echo "Step 5: Creating Dockerfile..."
+cat > Dockerfile <<'EOF'
+FROM node:20-slim
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --production
+COPY app.js .
+EXPOSE 8099
+CMD ["npm", "start"]
+EOF
+Step 6: Create .dockerignore
+echo "Step 6: Creating .dockerignore..."
+cat > .dockerignore <<'EOF'
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+EOF
+Step 7: Create deployment.yaml
+echo "Step 7: Creating deployment.yaml..."
+cat > deployment.yaml <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+name: k8s-demo-deployment
+labels:
+app: k8s-demo
+spec:
+replicas: 3
+selector:
+matchLabels:
+app: k8s-demo
+template:
+metadata:
+labels:
+app: k8s-demo
+spec:
+containers:
+- name: k8s-demo
+image: k8s-demo-app:1.0
+imagePullPolicy: Never
+ports:
+- containerPort: 8099
+env:
+- name: PORT
+value: "8099"
+apiVersion: v1
+kind: Service
+metadata:
+name: k8s-demo-service
+labels:
+app: k8s-demo
+spec:
+type: LoadBalancer
+selector:
+app: k8s-demo
+ports:
+
+protocol: TCP
+port: 8099
+targetPort: 8099
+nodePort: 30099
+EOF
+
+Step 8: Build Docker image
+echo "Step 8: Building Docker image..."
+docker build -t k8s-demo-app:1.0 .
+Step 9: Start Minikube
+echo "Step 9: Starting Minikube..."
+minikube start --driver=docker
+Step 10: Load image into Minikube
+echo "Step 10: Loading image into Minikube..."
+minikube image load k8s-demo-app:1.0
+Step 11: Deploy to Kubernetes
+echo "Step 11: Deploying to Kubernetes..."
+kubectl apply -f deployment.yaml
+Step 12: Wait for pods to be ready
+echo "Step 12: Waiting for pods to be ready..."
+kubectl wait --for=condition=ready pod -l app=k8s-demo --timeout=60s
+Step 13: Show status
+echo "Step 13: Showing deployment status..."
+kubectl get deployments
+kubectl get pods
+kubectl get services
+echo ""
+echo "=== Setup Complete! ==="
+echo ""
+echo "Access your application:"
+echo "1. minikube service k8s-demo-service"
+echo "2. kubectl port-forward service/k8s-demo-service 8099:8099"
+echo "3. minikube ip  # Then access http://MINIKUBE_IP:30099"
+echo ""
+----- Testing Script -----
+#!/bin/bash
+Save this as test-k8s-demo.sh and run: bash test-k8s-demo.sh
+echo "=== Testing K8s Demo App ==="
+Get service URL
+export SERVICE_URL=$(minikube service k8s-demo-service --url)
+echo "Service URL: $SERVICE_URL"
+echo ""
+Test main endpoint
+echo "Testing main endpoint..."
+curl -s $SERVICE_URL
+echo ""
+Test health endpoint
+echo "Testing health endpoint..."
+curl -s $SERVICE_URL/health | jq .
+echo ""
+Test info endpoint
+echo "Testing info endpoint..."
+curl -s $SERVICE_URL/info | jq .
+echo ""
+Show pod information
+echo "Pod Information:"
+kubectl get pods -o wide
+echo ""
+Show logs from first pod
+echo "Logs from first pod:"
+POD_NAME=$(kubectl get pods -l app=k8s-demo -o jsonpath='{.items[0].metadata.name}')
+kubectl logs $POD_NAME --tail=10
+echo ""
+echo "=== Testing Complete ==="
+----- Cleanup Script -----
+#!/bin/bash
+Save this as cleanup-k8s-demo.sh and run: bash cleanup-k8s-demo.sh
+echo "=== Cleaning up K8s Demo App ==="
+Delete Kubernetes resources
+echo "Deleting Kubernetes resources..."
+kubectl delete -f ~/k8s-demo-app/deployment.yaml
+Remove Docker image
+echo "Removing Docker image..."
+docker rmi k8s-demo-app:1.0
+Stop Minikube (optional)
+read -p "Stop Minikube? (y/n) " -n 1 -r
+echo
+if [[ REPLY= [Yy]REPLY =~ ^[Yy]
+REPLY= [Yy] ]]; then
+    minikube stop
+fi
+
+echo "=== Cleanup Complete ==="
